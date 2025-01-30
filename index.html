@@ -186,8 +186,163 @@
             });
         }
 
-        // Diğer oyun fonksiyonları buraya eklenecek...
-        // (movePlayer, checkCollision, placeNewTarget vb.)
+        function initializeGame(player) {
+            const initialData = {
+                x: 50,
+                y: 50,
+                score: 0
+            };
+
+            gameRef.child(player).set(initialData);
+            
+            // Oyuncu ayrılınca verilerini temizle
+            gameRef.child(player).onDisconnect().remove();
+
+            // Hedef konumunu başlat
+            if (player === 'player1') {
+                placeNewTarget();
+            }
+
+            // Oyun verilerini dinle
+            gameRef.on('value', (snapshot) => {
+                const gameData = snapshot.val() || {};
+                
+                if (gameData.player1) {
+                    updatePlayerPosition('player1', gameData.player1.x, gameData.player1.y);
+                    document.getElementById('score1').textContent = gameData.player1.score || 0;
+                }
+                
+                if (gameData.player2) {
+                    updatePlayerPosition('player2', gameData.player2.x, gameData.player2.y);
+                    document.getElementById('score2').textContent = gameData.player2.score || 0;
+                    document.getElementById('waitingMessage').style.display = 'none';
+                }
+
+                if (gameData.target) {
+                    updateTargetPosition(gameData.target.x, gameData.target.y);
+                }
+            });
+        }
+
+        function updatePlayerPosition(player, x, y) {
+            const playerEl = document.getElementById(player);
+            playerEl.style.left = x + 'px';
+            playerEl.style.top = y + 'px';
+        }
+
+        function updateTargetPosition(x, y) {
+            const target = document.getElementById('target');
+            target.style.left = x + 'px';
+            target.style.top = y + 'px';
+        }
+
+        function placeNewTarget() {
+            const x = Math.floor(Math.random() * 284);
+            const y = Math.floor(Math.random() * 284);
+            gameRef.child('target').set({ x, y });
+        }
+
+        function movePlayer(direction) {
+            if (!playerId || !gameRef) return;
+
+            gameRef.child(playerId).once('value', (snapshot) => {
+                const playerData = snapshot.val();
+                let { x, y } = playerData;
+                const STEP = 10;
+
+                switch(direction) {
+                    case 'up': y = Math.max(0, y - STEP); break;
+                    case 'down': y = Math.min(276, y + STEP); break;
+                    case 'left': x = Math.max(0, x - STEP); break;
+                    case 'right': x = Math.min(276, x + STEP); break;
+                }
+
+                gameRef.child(playerId).update({ x, y });
+                checkCollision(x, y);
+            });
+        }
+
+        function checkCollision(playerX, playerY) {
+            gameRef.child('target').once('value', (snapshot) => {
+                const targetData = snapshot.val();
+                if (!targetData) return;
+
+                const distance = Math.sqrt(
+                    Math.pow(playerX - targetData.x, 2) +
+                    Math.pow(playerY - targetData.y, 2)
+                );
+
+                if (distance < 30) {
+                    gameRef.child(playerId).child('score').transaction(score => (score || 0) + 1);
+                    placeNewTarget();
+                }
+            });
+        }
+
+        // Kontrol düğmelerinin olayları
+        const buttons = {
+            'up': document.getElementById('upBtn'),
+            'down': document.getElementById('downBtn'),
+            'left': document.getElementById('leftBtn'),
+            'right': document.getElementById('rightBtn')
+        };
+
+        let activeIntervals = {};
+
+        function startMoving(direction) {
+            if (activeIntervals[direction]) return;
+            
+            movePlayer(direction);
+            activeIntervals[direction] = setInterval(() => movePlayer(direction), 100);
+        }
+
+        function stopMoving(direction) {
+            if (activeIntervals[direction]) {
+                clearInterval(activeIntervals[direction]);
+                delete activeIntervals[direction];
+            }
+        }
+
+        // Kontrol düğmeleri için olay dinleyicileri
+        Object.entries(buttons).forEach(([direction, button]) => {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startMoving(direction);
+            }, { passive: false });
+
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                stopMoving(direction);
+            }, { passive: false });
+
+            button.addEventListener('mousedown', () => startMoving(direction));
+            button.addEventListener('mouseup', () => stopMoving(direction));
+            button.addEventListener('mouseleave', () => stopMoving(direction));
+        });
+
+        // Klavye kontrolleri
+        const keyMap = {
+            'ArrowUp': 'up',
+            'ArrowDown': 'down',
+            'ArrowLeft': 'left',
+            'ArrowRight': 'right'
+        };
+
+        document.addEventListener('keydown', (e) => {
+            const direction = keyMap[e.key];
+            if (direction) {
+                e.preventDefault();
+                startMoving(direction);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const direction = keyMap[e.key];
+            if (direction) {
+                e.preventDefault();
+                stopMoving(direction);
+            }
+        });
     </script>
 </body>
 </html> 
