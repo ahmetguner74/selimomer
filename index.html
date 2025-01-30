@@ -1,0 +1,25 @@
+<head>
+    <!-- Firebase CDN'lerini güncelleyelim -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+</head>
+
+<script>
+    // Firebase yapılandırması
+    const firebaseConfig = {
+        apiKey: "AIzaSyBTR2w0uyqolcqa49y6w568ZhfRvwcN42U",
+        authDomain: "bayrak-bilmece.firebaseapp.com",
+        databaseURL: "https://bayrak-bilmece-default-rtdb.firebaseio.com",
+        projectId: "bayrak-bilmece",
+        storageBucket: "bayrak-bilmece.firebasestorage.app",
+        messagingSenderId: "985791201366",
+        appId: "1:985791201366:web:ee847edf5cdb90c0177bf7",
+        measurementId: "G-PPY3JL7PJN"
+    };
+
+    // Firebase'i başlat
+    firebase.initializeApp(firebaseConfig);
+    const analytics = firebase.analytics();
+    const database = firebase.database();
+</script> 
