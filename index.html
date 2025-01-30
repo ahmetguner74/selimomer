@@ -204,9 +204,13 @@
             roomId = selectedRoom;
             gameRef = database.ref('games/' + roomId);
 
+            console.log('Odaya katılma denemesi:', selectedRoom);
+
             gameRef.once('value', (snapshot) => {
                 const gameData = snapshot.val() || {};
                 const players = Object.keys(gameData).filter(key => key !== 'target' && key !== 'bullets');
+                
+                console.log('Mevcut oyuncular:', players);
                 
                 if (players.length >= MAX_PLAYERS) {
                     alert('Oda dolu! (Maksimum 5 oyuncu)');
@@ -214,8 +218,9 @@
                 }
 
                 playerId = `player${players.length + 1}`;
-                initializeGame(playerId);
+                console.log('Yeni oyuncu ID:', playerId);
 
+                initializeGame(playerId);
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('gameContainer').style.display = 'block';
             });
@@ -227,47 +232,55 @@
                 y: Math.random() * 250,
                 score: 0,
                 color: getRandomColor(),
-                size: 24
+                size: 24,
+                lastDirection: 'right'
             };
 
-            gameRef.child(player).set(initialData);
-            gameRef.child(player).onDisconnect().remove();
+            console.log('Oyun başlatılıyor:', player, initialData);
 
-            if (player === 'player1') {
-                placeNewTarget();
-            }
+            gameRef.child(player).set(initialData)
+                .then(() => {
+                    console.log('Oyuncu verileri kaydedildi');
+                    
+                    // Oyuncu ayrılınca verilerini temizle
+                    gameRef.child(player).onDisconnect().remove();
 
-            // Oyun verilerini dinle
-            gameRef.on('value', (snapshot) => {
-                const gameData = snapshot.val() || {};
-                
-                // Tüm oyuncuları güncelle
-                Object.keys(gameData).forEach(playerKey => {
-                    if (playerKey !== 'target' && gameData[playerKey]) {
-                        const playerData = gameData[playerKey];
-                        updatePlayerPosition(
-                            playerKey, 
-                            playerData.x, 
-                            playerData.y, 
-                            playerData.color,
-                            playerData.size
-                        );
+                    if (player === 'player1') {
+                        placeNewTarget();
+                    }
+
+                    // Oyun verilerini dinle
+                    gameRef.on('value', (snapshot) => {
+                        const gameData = snapshot.val() || {};
+                        console.log('Oyun verileri güncellendi:', gameData);
                         
                         // Skor tablosunu güncelle
-                        const scoreElement = document.getElementById(`score${playerKey.slice(-1)}`);
-                        if (scoreElement) {
-                            scoreElement.textContent = playerData.score || 0;
+                        updateScoreBoard(gameData);
+                        
+                        // Oyuncuları güncelle
+                        Object.entries(gameData).forEach(([key, data]) => {
+                            if (key !== 'target' && key !== 'bullets') {
+                                updatePlayerPosition(key, data.x, data.y, data.color, data.size);
+                            }
+                        });
+
+                        // Hedefi güncelle
+                        if (gameData.target) {
+                            updateTargetPosition(gameData.target.x, gameData.target.y);
                         }
-                    }
+
+                        // Mermileri güncelle
+                        if (gameData.bullets) {
+                            updateBullets(gameData);
+                        }
+
+                        // Çarpışmaları kontrol et
+                        checkPlayerCollisions();
+                    });
+                })
+                .catch(error => {
+                    console.error('Oyuncu verisi kaydedilirken hata:', error);
                 });
-
-                if (gameData.target) {
-                    updateTargetPosition(gameData.target.x, gameData.target.y);
-                }
-
-                // Diğer oyuncuları kontrol et
-                checkPlayerCollisions();
-            });
         }
 
         function updatePlayerPosition(player, x, y, color, size) {
@@ -338,12 +351,12 @@
             const scoreBoard = document.getElementById('scoreBoard');
             scoreBoard.innerHTML = '';
             
-            Object.entries(gameData).forEach(([playerId, data]) => {
-                if (playerId !== 'target' && playerId !== 'bullets') {
+            Object.entries(gameData).forEach(([key, data]) => {
+                if (key !== 'target' && key !== 'bullets' && data) {
                     const scoreDiv = document.createElement('div');
                     scoreDiv.className = 'playerScore';
                     scoreDiv.style.backgroundColor = data.color;
-                    scoreDiv.textContent = `${playerId}: ${data.score}`;
+                    scoreDiv.textContent = `${key}: ${data.score}`;
                     scoreBoard.appendChild(scoreDiv);
                 }
             });
@@ -531,6 +544,15 @@
                 });
             });
         }
+
+        // Firebase bağlantı durumunu kontrol et
+        database.ref('.info/connected').on('value', (snap) => {
+            if (snap.val() === true) {
+                console.log('Firebase bağlantısı başarılı');
+            } else {
+                console.error('Firebase bağlantısı kesildi');
+            }
+        });
     </script>
 </body>
 </html> 
