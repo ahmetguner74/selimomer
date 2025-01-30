@@ -133,11 +133,8 @@
 </head>
 <body>
     <div id="loginScreen">
-        <h2>Oyun Odası</h2>
-        <div>
-            <button class="room-btn" onclick="joinRoom('oda1')">Oda 1'e Katıl</button>
-            <button class="room-btn" onclick="joinRoom('oda2')">Oda 2'ye Katıl</button>
-        </div>
+        <h2>Çok Oyunculu Oyun</h2>
+        <button class="room-btn" onclick="joinGame()">Oyuna Katıl</button>
     </div>
 
     <div id="waitingMessage" style="display: none;">Diğer oyuncu bekleniyor...</div>
@@ -177,34 +174,22 @@
         const database = firebase.database();
 
         let playerId = null;
-        let roomId = null;
         let gameRef = null;
+        const MAX_PLAYERS = 5;
 
         let bullets = [];
         const BULLET_SPEED = 5;
-        const MAX_PLAYERS = 5;
 
-        // Rastgele renk oluşturma fonksiyonu
-        function getRandomColor() {
-            const colors = [
-                '#2196F3', '#4CAF50', '#F44336', '#9C27B0', 
-                '#FF9800', '#795548', '#607D8B', '#E91E63',
-                '#FFEB3B', '#009688', '#3F51B5', '#CDDC39'
-            ];
-            return colors[Math.floor(Math.random() * colors.length)];
+        // Rastgele oyuncu ismi oluştur
+        function generatePlayerName() {
+            const prefix = "Steve";
+            const number = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+            return `${prefix}${number}`;
         }
 
-        // Oyuncu boyutu hesaplama (skor arttıkça büyüyecek)
-        function calculatePlayerSize(score) {
-            return 24 + (score * 2); // Her puan için 2px büyüme
-        }
-
-        // Oyun fonksiyonları
-        function joinRoom(selectedRoom) {
-            roomId = selectedRoom;
-            gameRef = database.ref('games/' + roomId);
-
-            console.log('Odaya katılma denemesi:', selectedRoom);
+        function joinGame() {
+            gameRef = database.ref('game');
+            console.log('Oyuna katılma denemesi');
 
             gameRef.once('value', (snapshot) => {
                 const gameData = snapshot.val() || {};
@@ -213,13 +198,17 @@
                 console.log('Mevcut oyuncular:', players);
                 
                 if (players.length >= MAX_PLAYERS) {
-                    alert('Oda dolu! (Maksimum 5 oyuncu)');
+                    alert('Oyun dolu! (Maksimum 5 oyuncu)');
                     return;
                 }
 
-                playerId = `player${players.length + 1}`;
-                console.log('Yeni oyuncu ID:', playerId);
+                // Rastgele bir oyuncu ismi oluştur
+                playerId = generatePlayerName();
+                while (players.includes(playerId)) {
+                    playerId = generatePlayerName();
+                }
 
+                console.log('Yeni oyuncu:', playerId);
                 initializeGame(playerId);
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('gameContainer').style.display = 'block';
