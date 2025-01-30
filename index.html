@@ -272,17 +272,29 @@
                 });
         }
 
+        function getRandomColor() {
+            const colors = [
+                '#2196F3', '#4CAF50', '#F44336', '#9C27B0', 
+                '#FF9800', '#795548', '#607D8B', '#E91E63',
+                '#FFEB3B', '#009688', '#3F51B5', '#CDDC39'
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function calculatePlayerSize(score) {
+            return 24 + (score * 2); // Her puan için 2px büyüme
+        }
+
         function updatePlayerPosition(player, x, y, color, size) {
-            const playerEl = document.getElementById(player);
+            let playerEl = document.getElementById(player);
             if (!playerEl) {
                 // Yeni oyuncu elementi oluştur
-                const newPlayer = document.createElement('div');
-                newPlayer.id = player;
-                newPlayer.className = 'player';
-                document.getElementById('gameArea').appendChild(newPlayer);
+                playerEl = document.createElement('div');
+                playerEl.id = player;
+                playerEl.className = 'player';
+                document.getElementById('gameArea').appendChild(playerEl);
             }
             
-            const playerEl = document.getElementById(player);
             playerEl.style.left = x + 'px';
             playerEl.style.top = y + 'px';
             playerEl.style.backgroundColor = color;
@@ -540,6 +552,14 @@
                 console.log('Firebase bağlantısı başarılı');
             } else {
                 console.error('Firebase bağlantısı kesildi');
+            }
+        });
+
+        // Ateş etme butonunu ekleyelim
+        document.addEventListener('DOMContentLoaded', () => {
+            const fireBtn = document.getElementById('fireBtn');
+            if (fireBtn) {
+                fireBtn.addEventListener('click', fireBullet);
             }
         });
     </script>
