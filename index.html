@@ -158,6 +158,21 @@
         let roomId = null;
         let gameRef = null;
 
+        // Rastgele renk oluşturma fonksiyonu
+        function getRandomColor() {
+            const colors = [
+                '#2196F3', '#4CAF50', '#F44336', '#9C27B0', 
+                '#FF9800', '#795548', '#607D8B', '#E91E63',
+                '#FFEB3B', '#009688', '#3F51B5', '#CDDC39'
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Oyuncu boyutu hesaplama (skor arttıkça büyüyecek)
+        function calculatePlayerSize(score) {
+            return 24 + (score * 2); // Her puan için 2px büyüme
+        }
+
         // Oyun fonksiyonları
         function joinRoom(selectedRoom) {
             roomId = selectedRoom;
@@ -165,40 +180,29 @@
 
             gameRef.once('value', (snapshot) => {
                 const gameData = snapshot.val() || {};
+                const players = Object.keys(gameData).filter(key => key !== 'target');
                 
-                if (!gameData.player1) {
-                    playerId = 'player1';
-                    initializeGame('player1');
-                } else if (!gameData.player2) {
-                    playerId = 'player2';
-                    initializeGame('player2');
-                } else {
-                    alert('Oda dolu!');
-                    return;
-                }
+                // Yeni oyuncu ID'si oluştur
+                playerId = `player${players.length + 1}`;
+                initializeGame(playerId);
 
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('gameContainer').style.display = 'block';
-                
-                if (Object.keys(gameData).length < 2) {
-                    document.getElementById('waitingMessage').style.display = 'block';
-                }
             });
         }
 
         function initializeGame(player) {
             const initialData = {
-                x: 50,
-                y: 50,
-                score: 0
+                x: Math.random() * 250,
+                y: Math.random() * 250,
+                score: 0,
+                color: getRandomColor(),
+                size: 24
             };
 
             gameRef.child(player).set(initialData);
-            
-            // Oyuncu ayrılınca verilerini temizle
             gameRef.child(player).onDisconnect().remove();
 
-            // Hedef konumunu başlat
             if (player === 'player1') {
                 placeNewTarget();
             }
@@ -207,27 +211,51 @@
             gameRef.on('value', (snapshot) => {
                 const gameData = snapshot.val() || {};
                 
-                if (gameData.player1) {
-                    updatePlayerPosition('player1', gameData.player1.x, gameData.player1.y);
-                    document.getElementById('score1').textContent = gameData.player1.score || 0;
-                }
-                
-                if (gameData.player2) {
-                    updatePlayerPosition('player2', gameData.player2.x, gameData.player2.y);
-                    document.getElementById('score2').textContent = gameData.player2.score || 0;
-                    document.getElementById('waitingMessage').style.display = 'none';
-                }
+                // Tüm oyuncuları güncelle
+                Object.keys(gameData).forEach(playerKey => {
+                    if (playerKey !== 'target' && gameData[playerKey]) {
+                        const playerData = gameData[playerKey];
+                        updatePlayerPosition(
+                            playerKey, 
+                            playerData.x, 
+                            playerData.y, 
+                            playerData.color,
+                            playerData.size
+                        );
+                        
+                        // Skor tablosunu güncelle
+                        const scoreElement = document.getElementById(`score${playerKey.slice(-1)}`);
+                        if (scoreElement) {
+                            scoreElement.textContent = playerData.score || 0;
+                        }
+                    }
+                });
 
                 if (gameData.target) {
                     updateTargetPosition(gameData.target.x, gameData.target.y);
                 }
+
+                // Diğer oyuncuları kontrol et
+                checkPlayerCollisions();
             });
         }
 
-        function updatePlayerPosition(player, x, y) {
+        function updatePlayerPosition(player, x, y, color, size) {
+            const playerEl = document.getElementById(player);
+            if (!playerEl) {
+                // Yeni oyuncu elementi oluştur
+                const newPlayer = document.createElement('div');
+                newPlayer.id = player;
+                newPlayer.className = 'player';
+                document.getElementById('gameArea').appendChild(newPlayer);
+            }
+            
             const playerEl = document.getElementById(player);
             playerEl.style.left = x + 'px';
             playerEl.style.top = y + 'px';
+            playerEl.style.backgroundColor = color;
+            playerEl.style.width = size + 'px';
+            playerEl.style.height = size + 'px';
         }
 
         function updateTargetPosition(x, y) {
@@ -242,40 +270,37 @@
             gameRef.child('target').set({ x, y });
         }
 
-        function movePlayer(direction) {
+        function checkPlayerCollisions() {
             if (!playerId || !gameRef) return;
 
-            gameRef.child(playerId).once('value', (snapshot) => {
-                const playerData = snapshot.val();
-                let { x, y } = playerData;
-                const STEP = 10;
+            gameRef.once('value', snapshot => {
+                const gameData = snapshot.val() || {};
+                const currentPlayer = gameData[playerId];
+                if (!currentPlayer) return;
 
-                switch(direction) {
-                    case 'up': y = Math.max(0, y - STEP); break;
-                    case 'down': y = Math.min(276, y + STEP); break;
-                    case 'left': x = Math.max(0, x - STEP); break;
-                    case 'right': x = Math.min(276, x + STEP); break;
-                }
+                Object.entries(gameData).forEach(([otherPlayerId, otherPlayer]) => {
+                    if (otherPlayerId !== playerId && otherPlayerId !== 'target') {
+                        const distance = Math.sqrt(
+                            Math.pow(currentPlayer.x - otherPlayer.x, 2) +
+                            Math.pow(currentPlayer.y - otherPlayer.y, 2)
+                        );
 
-                gameRef.child(playerId).update({ x, y });
-                checkCollision(x, y);
-            });
-        }
-
-        function checkCollision(playerX, playerY) {
-            gameRef.child('target').once('value', (snapshot) => {
-                const targetData = snapshot.val();
-                if (!targetData) return;
-
-                const distance = Math.sqrt(
-                    Math.pow(playerX - targetData.x, 2) +
-                    Math.pow(playerY - targetData.y, 2)
-                );
-
-                if (distance < 30) {
-                    gameRef.child(playerId).child('score').transaction(score => (score || 0) + 1);
-                    placeNewTarget();
-                }
+                        // Çarpışma kontrolü
+                        if (distance < (currentPlayer.size + otherPlayer.size) / 2) {
+                            // Büyük olan oyuncu küçük olanı yer
+                            if (currentPlayer.size > otherPlayer.size) {
+                                // Puan kazanma ve büyüme
+                                const scoreGain = Math.floor(otherPlayer.score / 2) + 1;
+                                gameRef.child(playerId).update({
+                                    score: currentPlayer.score + scoreGain,
+                                    size: calculatePlayerSize(currentPlayer.score + scoreGain)
+                                });
+                                // Yenilen oyuncuyu sıfırla
+                                gameRef.child(otherPlayerId).remove();
+                            }
+                        }
+                    }
+                });
             });
         }
 
